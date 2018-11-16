@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------------
 -- 
--- EE119 HW6 
+-- EE119 HW6 Sophia Liu
 -- 
 -- NTSC Controller
 --
@@ -19,26 +19,26 @@
 --
 -- A moore state machine is used, with the states shown below. 
 -- There are states for each of the vertical synchronization 
--- and blanking pulses, and for outputing horizontal video 
+-- and blanking pulses, and for outputting horizontal video 
 -- data. 
 -- 
 -- States: 
 --
---		SYNC equalizing pulse occuring in the first half of a line
+--		SYNC equalizing pulse occurring in the first half of a line
 --	EQ_LOW_STATE,			SYNC is first held low for EQ_LOW clocks. 
 --	EQ_HIGH_STATE,			SYNC is then held high for the rest of 
 -- 							the half-line
 --
---		SYNC equalizing pulse occuring in the second half of a line
+--		SYNC equalizing pulse occurring in the second half of a line
 --	EQ_LOW_STATE2,			SYNC is first held low for EQ_LOW clocks
 --	EQ_HIGH_STATE2,		SYNC is then held high for the rest of 
 --								the half-line
 --	
--- 	SYNC serration pulse occuring in the first half of a line 
+-- 	SYNC serration pulse occurring in the first half of a line 
 --	SER_LOW_STATE,			SYNC is held low for SER_LOW clocks
 --	SER_HIGH_STATE,		SYNC is then held high
 --
--- 	SYNC serration pulse occuring in the second half of a line 
+-- 	SYNC serration pulse occurring in the second half of a line 
 --	SER_LOW_STATE2,		SYNC is held low for SER_LOW clocks
 --	SER_HIGH_STATE2,		SYNC is then held high
 --
@@ -423,7 +423,7 @@ ARCHITECTURE Behavioral OF NTSC IS
 	END PROCESS;
 
 	-- Assign SYNC and BLANK outputs based on current state
-	PROCESS (State)
+	PROCESS (state)
 		BEGIN
 			CASE state IS
 				WHEN EQ_LOW_STATE | EQ_LOW_STATE2=>
