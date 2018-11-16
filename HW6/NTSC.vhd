@@ -45,7 +45,7 @@
 --		SYNC blank pulse 
 --	BLANK_LOW_STATE,		SYNC is held low for BLANK_LOW clocks
 --	BLANK_HIGH_STATE,		SYNC is held high for the remaining half-line
---	BLANK_HIGH2_STATE,	SYNC is held high for the second half-line
+--	BLANK_HIGH_STATE2,	SYNC is held high for the second half-line
 --	
 -- 	Normal horizontal even/odd video lines
 --	DATA_LOW_STATE,		SYNC is held low for DATA_LOW clocks
@@ -53,7 +53,6 @@
 --	DATA_ADDR_STATE,		Data is sent, with the column address incremented
 --	DATA_FP_STATE			Front porch, blanked for DATA_FP clocks
 -- 
--- State machine diagram: 
 --
 -- Ports:
 --		clk 		: IN std_logic;
@@ -134,7 +133,7 @@ ARCHITECTURE Behavioral OF NTSC IS
 	-- Blanking line 
 	BLANK_LOW_STATE,
 	BLANK_HIGH_STATE,
-	BLANK_HIGH2_STATE,
+	BLANK_HIGH_STATE2,
 	
 	-- Normal video line 
 	DATA_LOW_STATE,
@@ -167,7 +166,36 @@ ARCHITECTURE Behavioral OF NTSC IS
 	-- Line constants 
 	constant LINETOTAL : integer := 525; 
 	-- 	Total number of lines to output 
+	constant EQSER		: integer := 266; 
+	-- 	line with half equalizing half serration pulse 
+	constant BLANKEQ	: integer := 263; 
+	-- 	line with half blanked half equalizing pulse 
+	constant SEREQ		: integer := 269; 
+	--		line with half serration half equalizing pulse 
+	constant EQBLANK	: integer := 272; 
+	-- 	line with half equalizing half blanked pulse
 	
+	constant EQSER_EVEN : integer := 3; 
+	--		line to transition from equalizing to serration pulses for even lines
+	constant SEREQ_EVEN : integer := 6; 
+	--		line to transition from serration to equalizing pulses for even lines
+	constant EQBLANK_EVEN : integer := 9; 
+	--		line to transition from serration to equalizing pulses for even lines
+	constant BLANKEQ_EVEN : integer := 525; 
+	--		line to transition from blanking to equalizing pulses for even lines
+	constant BLANKEVEN : integer := 20; 
+	--		line to transition from blanking to even video lines 
+	constant BLANKODD : integer := 283; 
+	--		line to transition from blanking to odd video lines
+	
+	constant DATAEVEN : integer := BLANKEVEN + 1; 
+	constant DATAODD: integer := BLANKODD + 1;
+	-- 	beginning line of even and odd video data lines 
+	constant DATAEVEN_DONE : integer := 260; 
+	constant DATAODD_DONE : integer := 523;
+	--		end line of even and odd video data lines
+	constant DATAWIDTH : integer := 512; 
+	-- 	horizontal pixel width of image
 	
 	-- Internal signals 
 	-- 8 bit internal EPROM row address signal 
@@ -181,175 +209,213 @@ ARCHITECTURE Behavioral OF NTSC IS
 	
 	begin
 	process (clk)
-	-- internal counter that keeps track of current line number
-	variable dline : INTEGER RANGE 1 TO LINETOTAL + 1 := 1;
+	-- internal counter that keeps track of current display line number
+	variable dline : integer range 1 to LINETOTAL + 1 := 1;
 	begin
-		IF rising_edge(clk) THEN
-			CASE state IS
+		if rising_edge(clk) then 
+			case state is
 				WHEN EQ_LOW_STATE =>
+					-- move to rest of equalizing pulse after EQ_LOW clocks
 					IF holdCount = EQ_LOW THEN
-						-- move to rest of equalizing pulse after EQ_LOW clocks
-						State <= EQ_HIGH_STATE;
+						state<= EQ_HIGH_STATE;
 					ELSE
-						-- wait for correct number of clocks to elapse
-						State <= EQ_LOW_STATE;
+						-- wait for correct number of clocks to elapse before transitioning 
+						state<= EQ_LOW_STATE;
 					END IF;
 
 				WHEN EQ_HIGH_STATE =>
 					IF holdCount = PULSEPER THEN
+						-- upon finishing half of line, check what to do next 
+						-- based on current line number
 							--State <= EQ_LOW_STATE2; TODO remove
-						IF dline = 266 THEN --TODO magic numbers
-							State <= SER_LOW_STATE2;
-						ELSIF dline = 272 THEN 
-							State <= BLANK_HIGH2_STATE;
+						IF dline = EQSER THEN --266 THEN 
+							state<= SER_LOW_STATE2;	
+						ELSIF dline = EQBLANK THEN--272 THEN 
+							state<= BLANK_HIGH_STATE2;
 						ELSE
-							State <= EQ_LOW_STATE2;
+							state<= EQ_LOW_STATE2;
 						END IF;
 					ELSE 
-						State <= EQ_HIGH_STATE;
+						-- wait for correct number of clocks to elapse
+						state<= EQ_HIGH_STATE;
 					END IF;
 
 				WHEN EQ_LOW_STATE2 =>
+					-- move to rest of equalizing pulse after EQ_LOW clocks
 					IF holdCount = EQ_LOW THEN 
-						State <= EQ_HIGH_STATE2;
+						state<= EQ_HIGH_STATE2;
 					ELSE
-						State <= EQ_LOW_STATE2;
+						-- wait for correct number of clocks before transitioning 
+						state<= EQ_LOW_STATE2;
 					END IF;
 				
 				WHEN EQ_HIGH_STATE2 =>
 					IF holdCount = PULSEPER THEN
-						IF dline = 3 THEN
-							State <= SER_LOW_STATE;
-						ELSIF dline = 9 THEN
-							State <= BLANK_LOW_STATE;
+						-- upon finishing second half of line, check what to do 
+						-- next based on current line number 
+						IF dline = EQSER_EVEN THEN--3 THEN
+							state<= SER_LOW_STATE;
+						ELSIF dline = EQBLANK_EVEN THEN--9 THEN
+							state<= BLANK_LOW_STATE;
 						ELSE
-							State <= EQ_LOW_STATE;
+							state<= EQ_LOW_STATE;
 						END IF;
+						-- advance to the next line 
 						dline := dline + 1;
 					ELSE 
-						State <= EQ_HIGH_STATE2;
+						-- wait for line to finish
+						state<= EQ_HIGH_STATE2;
 					END IF;
 					
 				WHEN SER_LOW_STATE =>
+					-- move to rest of serration pulse after SER_LOW clocks
 					IF holdCount = SER_LOW THEN
-						State <= SER_HIGH_STATE;
+						state<= SER_HIGH_STATE;
 					ELSE
-						State <= SER_LOW_STATE;
+						state<= SER_LOW_STATE;
 					END IF;
 
 				WHEN SER_HIGH_STATE =>
 					IF holdCount = PULSEPER THEN
-						IF dline = 269 THEN --TODO magic
-							State <= EQ_LOW_STATE2;
+					-- upon finishing half of line, check what to do 
+					-- in second half of line next based on current line number 
+						IF dline = SEREQ THEN --269 THEN 
+							state<= EQ_LOW_STATE2;
 						ELSE
-							State <= SER_LOW_STATE2;
+							state<= SER_LOW_STATE2;
 						END IF;
 					ELSE
-						State <= SER_HIGH_STATE;
+						-- wait for half of line to finish
+						state<= SER_HIGH_STATE;
 					END IF;
 					
 				WHEN SER_LOW_STATE2 =>
+					--  move to rest of serration pulse after SER_LOW clocks
 					IF holdCount = SER_LOW THEN
-						State <= SER_HIGH_STATE2;
+						state<= SER_HIGH_STATE2;
 					ELSE
-						State <= SER_LOW_STATE2;
+						-- wait for SER_LOW clocks before advancing
+						state<= SER_LOW_STATE2;
 					END IF;
 
 				WHEN SER_HIGH_STATE2 =>
+					-- upon finishing line, check what to do 
+					-- in next line based on current line number 
 					IF holdCount = PULSEPER THEN
-						IF dline = 6 THEN
-							State <= EQ_LOW_STATE;
+						IF dline = SEREQ_EVEN THEN --6 THEN
+							state<= EQ_LOW_STATE;
 						ELSE
-							State <= SER_LOW_STATE;
+							state<= SER_LOW_STATE;
 						END IF;
+						-- advance to next line 
 						dline := dline + 1;
 					ELSE
-						State <= SER_HIGH_STATE2;
+						-- wait for line to finish
+						state<= SER_HIGH_STATE2;
 					END IF;
 
 				WHEN BLANK_LOW_STATE =>
+					-- move to rest of blank pulse after BLANK_LOW clocks
 					IF holdCount = BLANK_LOW THEN
-						State <= BLANK_HIGH_STATE;
+						state<= BLANK_HIGH_STATE;
 					ELSE
-						State <= BLANK_LOW_STATE;
+						state<= BLANK_LOW_STATE;
 					END IF;
 
 				WHEN BLANK_HIGH_STATE =>
+					-- upon finishing blank pulse, check what to do 
+					-- in next half line based on current line number
 					IF holdCount = PULSEPER THEN
-						IF dline = 263 THEN --TODO magic
-							State <= EQ_LOW_STATE2;
+						IF dline = BLANKEQ THEN --263 THEN --TODO magic
+							state<= EQ_LOW_STATE2;
 						ELSE
-							State <= BLANK_HIGH2_STATE;
+							state<= BLANK_HIGH_STATE2;
 						END IF;
 					ELSE
-						State <= BLANK_HIGH_STATE;
+						-- wait for pulse to finish
+						state<= BLANK_HIGH_STATE;
 					END IF;
 
-				WHEN BLANK_HIGH2_STATE =>
+				WHEN BLANK_HIGH_STATE2 =>
+					-- upon finishing blank line, check whether to do 
+					-- an equalizing pulse, video lines, or more blank lines 
+					-- based on current line number
 					IF holdCount = PULSEPER THEN
-						IF dline = 525 THEN --TODO magic
-							State <= EQ_LOW_STATE;
-						ELSIF dline = 20 OR dline = 283 THEN
-							State <= DATA_LOW_STATE;
+						IF dline = BLANKEQ_EVEN THEN--525 THEN --TODO magic
+							state <= EQ_LOW_STATE;
+						ELSIF dline = BLANKEVEN or dline = BLANKODD THEN--20 OR dline = 283 THEN
+							state <= DATA_LOW_STATE;
 						ELSE 
-							State <= BLANK_LOW_STATE; 
+							state <= BLANK_LOW_STATE; 
 						END IF;
-
+						-- advance to next line 
 						dline := dline + 1;
-						IF dline > 525 THEN
-							dline := 1;
+						IF dline > LINETOTAL THEN
+							dline := 1; -- wrap line count back to beginning
 						END IF;
 					ELSE
-						State <= BLANK_HIGH2_STATE;
+						-- wait for line to finish
+						state<= BLANK_HIGH_STATE2;
 					END IF;
 
 				WHEN DATA_LOW_STATE =>
+					-- move to back porch state after DATA_LOW clocks
 					IF holdCount = DATA_LOW THEN
-						State <= DATA_BP_STATE;
+						state<= DATA_BP_STATE;
 					ELSE
-						State <= DATA_LOW_STATE;
+						state<= DATA_LOW_STATE;
 					END IF;
 
 				WHEN DATA_BP_STATE =>
+					-- move to video data state after another DATA_BP clocks
 					IF holdCount = DATA_LOW + DATA_BP THEN
-						State <= DATA_ADDR_STATE;
-						IF dline = 21 then 
+						state<= DATA_ADDR_STATE;
+						-- assign initial row and column EPROM addresses
+						IF dline = DATAEVEN THEN--21 then 
 							odd <= '0';
 							row <= "00000000";
-						ELSIF dline = 284 then 
+						ELSIF dline = DATAODD THEN--284 then 
 							odd <= '1';
 							row <= "00000000";
 						END IF;
 						col <= "0000000000";
 						addrrow <= row;
 					ELSE
-						State <= DATA_BP_STATE;
+						state<= DATA_BP_STATE;
 					END IF;
 
 				WHEN DATA_ADDR_STATE =>
+					-- output and increment column EPROM address 
 					addrcol <= col;
 					col <= std_logic_vector(unsigned(col) + 1);
-					IF unsigned(col) = 512 THEN
-						State <= DATA_FP_STATE;
+					IF unsigned(col) = DATAWIDTH THEN
+						-- done once entire row has been outputted
+						state<= DATA_FP_STATE;
 					ELSE
-						State <= DATA_ADDR_STATE;
+						state<= DATA_ADDR_STATE;
 					END IF;
 
 				WHEN DATA_FP_STATE =>
 					IF holdCount = PULSEPER THEN
-						IF dline = 260 OR dline = 523 THEN
-							State <= BLANK_LOW_STATE;
+						IF dline = DATAEVEN_DONE or dline = DATAODD_DONE THEN--260 OR dline = 523 THEN
+							-- move to blank state if all even or odd lines are finished
+							state<= BLANK_LOW_STATE;
 						ELSE
+							-- otherwise, increment row and continue to next video data line 
 							row <= std_logic_vector(unsigned(row) + 1);
-							State <= DATA_LOW_STATE;
+							state<= DATA_LOW_STATE;
 						END IF;
+						-- advance to next linee 
 						dline := dline + 1;
 					ELSE
-						State <= DATA_FP_STATE;
+						-- wait for front porch blanking to finish 
+						state<= DATA_FP_STATE;
 					END IF;
 			END CASE;
 			
+			-- increment the timing counter with clock rising edge
 			IF holdCount = PULSEPER THEN
+				-- wrap counter after half a line (or 1 blanking pulse)
 				holdCount <= 1;
 			ELSE
 				holdCount <= holdCount + 1;
@@ -357,43 +423,28 @@ ARCHITECTURE Behavioral OF NTSC IS
 		end if; 
 	END PROCESS;
 
-	-- assign outputs
+	-- Assign SYNC and BLANK outputs based on current state
 	PROCESS (State)
 		BEGIN
-			CASE State IS
+			CASE state IS
 				WHEN EQ_LOW_STATE | EQ_LOW_STATE2=>
 					sync <= '1';
-					blank <= '0';
---				WHEN EQ_LOW_STATE2 => 
---					sync <= '1';
---					blank <= '0';				
-				WHEN SER_LOW_STATE =>
+					blank <= '0';			
+				WHEN SER_LOW_STATE | SER_LOW_STATE2=>
 					sync <= '1';
 					blank <= '0';				
-				WHEN SER_LOW_STATE2 => 
-					sync <= '1';
-					blank <= '0';			
 				WHEN BLANK_LOW_STATE => 
 					sync <= '1';
 					blank <= '0';			
-				WHEN EQ_HIGH_STATE =>
+				WHEN EQ_HIGH_STATE | EQ_HIGH_STATE2 =>
 					sync <= '0';
 					blank <= '0';
-				WHEN EQ_HIGH_STATE2 =>
+				WHEN SER_HIGH_STATE | SER_HIGH_STATE2 =>
 					sync <= '0';
 					blank <= '0';
-				WHEN SER_HIGH_STATE =>
-					sync <= '0';
-					blank <= '0';
-				WHEN SER_HIGH_STATE2  =>
-					sync <= '0';
-					blank <= '0';
-				WHEN BLANK_HIGH_STATE => 
+				WHEN BLANK_HIGH_STATE | BLANK_HIGH_STATE2=> 
 					sync <= '0'; 
-					blank <= '0'; 
-				WHEN BLANK_HIGH2_STATE => 
-					sync <= '0'; 
-					blank <= '0'; 				
+					blank <= '0'; 		
 				WHEN DATA_LOW_STATE =>
 					sync <= '1';
 					blank <= '1';
