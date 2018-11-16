@@ -227,10 +227,9 @@ ARCHITECTURE Behavioral OF NTSC IS
 					IF holdCount = PULSEPER THEN
 						-- upon finishing half of line, check what to do next 
 						-- based on current line number
-							--State <= EQ_LOW_STATE2; TODO remove
-						IF dline = EQSER THEN --266 THEN 
+						IF dline = EQSER THEN 
 							state<= SER_LOW_STATE2;	
-						ELSIF dline = EQBLANK THEN--272 THEN 
+						ELSIF dline = EQBLANK THEN
 							state<= BLANK_HIGH_STATE2;
 						ELSE
 							state<= EQ_LOW_STATE2;
@@ -253,9 +252,9 @@ ARCHITECTURE Behavioral OF NTSC IS
 					IF holdCount = PULSEPER THEN
 						-- upon finishing second half of line, check what to do 
 						-- next based on current line number 
-						IF dline = EQSER_EVEN THEN--3 THEN
+						IF dline = EQSER_EVEN THEN
 							state<= SER_LOW_STATE;
-						ELSIF dline = EQBLANK_EVEN THEN--9 THEN
+						ELSIF dline = EQBLANK_EVEN THEN
 							state<= BLANK_LOW_STATE;
 						ELSE
 							state<= EQ_LOW_STATE;
@@ -279,7 +278,7 @@ ARCHITECTURE Behavioral OF NTSC IS
 					IF holdCount = PULSEPER THEN
 					-- upon finishing half of line, check what to do 
 					-- in second half of line next based on current line number 
-						IF dline = SEREQ THEN --269 THEN 
+						IF dline = SEREQ THEN  
 							state<= EQ_LOW_STATE2;
 						ELSE
 							state<= SER_LOW_STATE2;
@@ -302,7 +301,7 @@ ARCHITECTURE Behavioral OF NTSC IS
 					-- upon finishing line, check what to do 
 					-- in next line based on current line number 
 					IF holdCount = PULSEPER THEN
-						IF dline = SEREQ_EVEN THEN --6 THEN
+						IF dline = SEREQ_EVEN THEN
 							state<= EQ_LOW_STATE;
 						ELSE
 							state<= SER_LOW_STATE;
@@ -326,7 +325,7 @@ ARCHITECTURE Behavioral OF NTSC IS
 					-- upon finishing blank pulse, check what to do 
 					-- in next half line based on current line number
 					IF holdCount = PULSEPER THEN
-						IF dline = BLANKEQ THEN --263 THEN --TODO magic
+						IF dline = BLANKEQ THEN 
 							state<= EQ_LOW_STATE2;
 						ELSE
 							state<= BLANK_HIGH_STATE2;
@@ -341,9 +340,9 @@ ARCHITECTURE Behavioral OF NTSC IS
 					-- an equalizing pulse, video lines, or more blank lines 
 					-- based on current line number
 					IF holdCount = PULSEPER THEN
-						IF dline = BLANKEQ_EVEN THEN--525 THEN --TODO magic
+						IF dline = BLANKEQ_EVEN THEN
 							state <= EQ_LOW_STATE;
-						ELSIF dline = BLANKEVEN or dline = BLANKODD THEN--20 OR dline = 283 THEN
+						ELSIF dline = BLANKEVEN or dline = BLANKODD THEN
 							state <= DATA_LOW_STATE;
 						ELSE 
 							state <= BLANK_LOW_STATE; 
@@ -371,10 +370,10 @@ ARCHITECTURE Behavioral OF NTSC IS
 					IF holdCount = DATA_LOW + DATA_BP THEN
 						state<= DATA_ADDR_STATE;
 						-- assign initial row and column EPROM addresses
-						IF dline = DATAEVEN THEN--21 then 
+						IF dline = DATAEVEN THEN 
 							odd <= '0';
 							row <= "00000000";
-						ELSIF dline = DATAODD THEN--284 then 
+						ELSIF dline = DATAODD THEN
 							odd <= '1';
 							row <= "00000000";
 						END IF;
@@ -397,7 +396,7 @@ ARCHITECTURE Behavioral OF NTSC IS
 
 				WHEN DATA_FP_STATE =>
 					IF holdCount = PULSEPER THEN
-						IF dline = DATAEVEN_DONE or dline = DATAODD_DONE THEN--260 OR dline = 523 THEN
+						IF dline = DATAEVEN_DONE or dline = DATAODD_DONE THEN
 							-- move to blank state if all even or odd lines are finished
 							state<= BLANK_LOW_STATE;
 						ELSE
