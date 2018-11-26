@@ -1,10 +1,24 @@
 ----------------------------------------------------------------------------
 --
---  1 bit full adder 
+--  1 Bit Full Adder
+--
+--  Implementation of a full adder. This entity takes the one bit 
+--  inputs A and B with a carry in input and outputs the sum and carry 
+--  out bits, using combinational logic. 
+--
+-- Inputs:
+-- 		A: std_logic - 1 bit adder input
+--			B: std_logic - 1 bit adder input
+-- 		Cin: std_logic - 1 bit carry in input
+--
+-- Outputs:
+-- 		Sum: std_logic - 1 bit sum of A, B, and Cin
+--       Cout: std_logic - 1 bit carry out value 
 --
 --  Revision History:
---      11/01/18  Sophia Liu    Initial revision.
--- 
+--      11/21/18  Sophia Liu    Initial revision.
+--      11/22/18  Sophia Liu    Updated comments.
+--
 ----------------------------------------------------------------------------
 
 library ieee;
@@ -13,25 +27,23 @@ use ieee.numeric_std.all;
 
 entity fullAdder is
 	port(
-		A   		:  in      std_logic;
-		B 	 		:  in      std_logic;   					
-		Cin  		:  in      std_logic;						
-		Cout    	:  out     std_logic; 
-		Sum  		:  out      std_logic
+		A   		:  in      std_logic;  -- adder input 
+		B 	 		:  in      std_logic;  -- adder input 
+		Cin  		:  in      std_logic;  -- carry in value 
+		Cout    	:  out     std_logic;  -- carry out value 
+		Sum  		:  out     std_logic   -- sum of A, B with carry in
 	  );
 end fullAdder;
 
-architecture fullAdder of fullAdder is 
-	begin 
-		Sum <= A xor B xor Cin; 
-		Cout <= (A and B) or (A and Cin) or (B and Cin); 
-end fullAdder; 
+architecture fullAdder of fullAdder is
+	begin
+		-- combinational logic for calculating the sum and carry out bit
+		Sum <= A xor B xor Cin;
+		Cout <= (A and B) or (A and Cin) or (B and Cin);
+end fullAdder;
 
 
--- bring in the necessary packages
-library  ieee;
-use  ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+
 
 
 ----------------------------------------------------------------------------
@@ -40,8 +52,15 @@ use ieee.numeric_std.all;
 --
 --  This is an implementation of an n-bit bit serial multiplier.  The
 --  calculation will take 2n^2 clocks after the START signal is activated.
---  The multiplier is implemented with a single adder.  This file contains
---  only the entity declaration for the multiplier.
+--  The multiplier is implemented with a moore state machine and a single 
+--  one bit adder. 
+--
+--  The state machine starts with an active START signal 
+--  and continually shifts the multiplicand, multiplies the last bit with 
+--  the last multiplier bit, and adds it to the product register.
+--  The multiplier register is then shifted to the next bit until the 
+--  multiplication is completed. The DONE signal is pulled high for one 
+--  clock upon completion. 
 --
 --  Parameters:
 --      numbits - number of bits in the multiplicand and multiplier (n)
@@ -64,8 +83,13 @@ use ieee.numeric_std.all;
 --                                  type out.
 --     21 Nov 05  Glen George       Changed nobits to numbits for clarity
 --                                  and updated comments.
---
+--     21 Nov 18  Sophia Liu        Added architecture and implementation
+--     22 Nov 18  Sophia Liu        Updated comments
 ----------------------------------------------------------------------------
+
+library  ieee;
+use  ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 entity  BitSerialMultiplier  is
 
@@ -84,155 +108,127 @@ entity  BitSerialMultiplier  is
 
 end  BitSerialMultiplier;
 
--- TODO bring in entity instead 
+architecture bitMult of BitSerialMultiplier is
 
-architecture bitMult of BitSerialMultiplier is 
-
--- components 
-
-	component shiftReg 
-		generic (
-			n  :  integer
-		);
-		port(
-			DI   :  in      std_logic_vector(n-1 downto 0 );
-			LSI  :  in      std_logic;   					
-			RSI  :  in      std_logic;						
-			S    :  in      std_logic_vector(1 downto 0); 
-			CLR  :  in      std_logic;	
-			CLK  :  in      std_logic;	
-			DO   :  buffer  std_logic_vector(n-1 downto 0)
-       );
-	end component; 
-	
+	-- component declarations 
 	component fullAdder
 		port(
 			A   		:  in      std_logic;
-			B 	 		:  in      std_logic;   					
-			Cin  		:  in      std_logic;						
-			Cout    	:  out     std_logic; 
+			B 	 		:  in      std_logic;
+			Cin  		:  in      std_logic;
+			Cout    	:  out     std_logic;
 			Sum  		:  out      std_logic
 		);
-	end component; 
+	end component;
 	
+	-- internal signals for adder component 
+	signal adderCin : std_logic := '0';
+	signal adderCout : std_logic;
+	signal adderSum : std_logic;
+
+	
+	
+	-- Shift registers 
+		-- Muliplicand (A) shift register 
 	signal Areg : std_logic_vector((numbits - 1) downto 0);
-	
+		-- Multiplier (B) shift register 
 	signal Breg : std_logic_vector((numbits - 1) downto 0);
-	
+		-- Product (Q) shift register 
 	signal Qreg : std_logic_vector((2*numbits - 1) downto 0);
 	
-	signal adderA : std_logic; 
-	signal adderB : std_logic;
-	signal adderCin : std_logic := '0'; 
-	signal adderCout : std_logic; 
-	signal adderSum : std_logic;
-	
+	-- Moore state machine for unsigned multiplier
 	type multStates is (
-		IDLE,
-		SHIFT,
-		ADD,
-		NEXTBIT, 
-		FINISH
+		IDLE,		-- Idle state, waiting for start input 
+		SHIFT,	-- Shift product register 
+		ADD,     -- Add product to product register, shift multiplicand 
+		NEXTBIT, -- Shift product register and muliplier register
+		FINISH   -- Finished multiplying 
 	);
-	
-	signal curState : multStates := IDLE; 
-	
-	signal bitCountA : integer range 1 to numbits := 1; 
-	signal bitCountB : integer range 1 to numbits := 1; 
-	signal bitProduct: std_logic; 
-	
+
+	signal curState : multStates := IDLE; -- State variable
+
+	-- Counters for current multiplicand, multiplier, and product bit  
+	signal bitCountA : integer range 1 to numbits := 1;
+	signal bitCountB : integer range 1 to numbits := 1;
+	signal bitProduct: std_logic;
+
 	begin
-	
+	-- adder instance for adding the next bit product to the product register
 	adder: fullAdder
 	port map(
 		A 	 	=> Qreg(0),
-		B		=> bitProduct,					
+		B		=> bitProduct,
 		Cin 	=> adderCin,
 		Cout  => adderCout,
 		Sum  	=> adderSum
 	  );
-	 
-	bitProduct <= Areg(0) and Breg(0); 
-	
-	process(clk) 
-		begin 
-		if rising_edge(clk) then 
-			case curState is 
-				when IDLE => 
-					DONE <= '0'; 
-					if START = '1' then 
-						Areg <= A; 
-						Breg <= B; 
-						Qreg <= (others => '0');
-						adderCin <= '0';
-						bitCountA <= 1; 
+	  
+	-- 1 bit multiplier for the last bits of multiplicand and multiplier  
+	bitProduct <= Areg(0) and Breg(0);
+
+	process(clk)
+		begin
+		if rising_edge(clk) then
+			case curState is
+				when IDLE =>
+					DONE <= '0';
+					-- On start signal, move multiplier and multiplicand into 
+					-- registers, initialize other signals 
+					if START = '1' then
+						Areg <= A;
+						Breg <= B;
+						Qreg <= (others => '0'); -- Product is initially zero 
+						adderCin <= '0';	-- Initially no carry in value
+						bitCountA <= 1;	-- Initially start at first bit in registers
 						bitCountB <= 1;
-						curState <= SHIFT;
-					else 
-						curState <= IDLE; 
-					end if; 
+						curState <= SHIFT;	-- Begin multiplying 
+					else
+						curState <= IDLE;
+					end if;
+					
 				when SHIFT =>
-						-- roate Q right 
+						-- rotate product right to add to next product term  
 						Qreg <= std_logic_vector(unsigned(Qreg) ror 1);
-						curState <= ADD; 
-					
+						curState <= ADD;
+
 				when ADD =>
-						Qreg(0) <= adderSum; 
-						adderCin <= adderCout;
-						-- rotate A right 
-						Areg <= std_logic_vector(unsigned(Areg) ror 1); 
-						
+					-- Add and replace product bit with correct sum 
+					Qreg(0) <= adderSum;
+					-- carry in the carry output from the sum to the next term
+					adderCin <= adderCout;
+					-- rotate multiplier right to move to next multiplicand bit
+					Areg <= std_logic_vector(unsigned(Areg) ror 1);
+					-- continue if haven't gone through all multiplicand bits
 					if bitCountA < numbits then 
-						bitCountA <= bitCountA + 1; 
-						curState <= SHIFT; 
-					else 
-						Qreg(1) <= adderCout;
-						adderCin <= '0';
-						bitCountA <= 1;
-						curState <= NEXTBIT; 
-					end if; 
-					
-				when NEXTBIT => 
-						-- shift product register back n-1 times for next bit 
-					if bitCountB < numbits then 
+						bitCountA <= bitCountA + 1;
+						curState <= SHIFT;
+					else -- Finished with current multiplier bit
+						Qreg(1) <= adderCout;	-- add in final carry out 
+						adderCin <= '0';			-- reset carry in bit 
+						bitCountA <= 1;			-- reset multiplicand bit count
+						curState <= NEXTBIT;		
+					end if;
+
+				when NEXTBIT =>
+					if bitCountB < numbits then -- haven't finished multiplying 
+						-- shift product register back to add next group of products
 						Qreg <= std_logic_vector(unsigned(Qreg) rol numbits - 1);
-						Breg <= std_logic_vector(unsigned(Breg) ror 1); 
-						bitCountB <= bitCountB + 1; 
-						curState <= SHIFT; 
-					else 
-						Qreg <= std_logic_vector(unsigned(Qreg) ror 2);
+						-- move to next multiplier bit 
+						Breg <= std_logic_vector(unsigned(Breg) ror 1);
+						bitCountB <= bitCountB + 1; 	-- moving to next multiplier bit
+						curState <= SHIFT;				-- coninue shifting and adding 
+					else	-- finished multiplying 
+						-- Shift product register back to initial position 
+						-- assign product output 
+						Q <= std_logic_vector(unsigned(Qreg) ror 2);
 						curState <= FINISH;
 					end if;
-				
-				when FINISH => 
-					Q <= Qreg; 
-					DONE <= '1'; 
-					curState <= IDLE; 
-			end case; 
+
+				when FINISH =>
+					DONE <= '1';		-- send DONE signal to indicate product finished 
+					curState <= IDLE; -- go back to idle to wait for START
+					
+			end case;
 		end if;
-		 
 	end process;
-	
---	process(curState) 
---	begin 
---		case curState is 
---			when IDLE => 
---			
---			when SHIFT => 
---			
---			when ADD => 
---			
---			when NEXTBIT =>
---			
---			when FINISH => 
---			
---		end case;	
---	
---	end process;
-	
-				
 end bitMult;
-
-
-
-
