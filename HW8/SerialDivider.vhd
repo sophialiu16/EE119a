@@ -61,27 +61,26 @@ entity  SerialDivider  is
     port (
         nReset      :  in   std_logic;
         nCalculate  :  in   std_logic;
-        --Divisor     :  in   std_logic;
-        --KeypadRdy   :  in   std_logic;
-        --Keypad      :  in   std_logic_vector(3 downto 0);
+        DivisorSelIn  :  in   std_logic;
+        KeypadRdy   :  in   std_logic;
+        Keypad      :  in   std_logic_vector(3 downto 0);
         HexDigit    :  out  std_logic_vector(3 downto 0);
         DecoderEn   :  out  std_logic;
         DecoderBit  :  out  std_logic_vector(3 downto 0);
 		  DivideDoneOut : out std_logic; 
         
-		  CLK         :  in   std_logic
+		  CLK         :  in   std_logic;
 		  
---		  KeypadRdy   :  in   std_logic;
---        Keypad      :  in   std_logic_vector(3 downto 0);
---		  KeypadRow   :  in   std_logic_vector(3 downto 0); 
---		  KeypadCol   :  in   std_logic_vector(3 downto 0); 
+		  KeypadRow   :  in   std_logic_vector(3 downto 0); 
+		  KeypadCol   :  in   std_logic_vector(3 downto 0); 
+		  DigitSel    :  out  std_logic_vector(11 downto 0); 
 --		  Divisor	  :  in   std_logic; 
 --		  Calculate   :  in   std_logic; 
 --		  HexDigit    :  out  std_logic_vector(3 downto 0); 
 --		  DecoderEn   :  out  std_logic; 
 --		  DecoderBit  :  out  std_logic_vector(3 downto 0); 
 --		  Digit       :  out  std_logic_vector(11 downto 0); 
---		  Segment     :  out  std_logic_vector(6 downto 0)
+		  Segments     :  out  std_logic_vector(6 downto 0)
 		  --TODO separate structure
     );
 
@@ -129,7 +128,7 @@ architecture  demo  of  SerialDivider  is
 	
 	signal DivideDone : std_logic; 
 	
-	signal NextRem : std_logic; 
+	signal DivisorSel : std_logic; 
 
 begin
 
@@ -183,6 +182,14 @@ begin
 		end if; 
 	 end process; 
 	 
+	 
+	 process(CLK) --TODO need?
+	 begin 
+		if rising_edge(CLK) then 
+			DivisorSel <= DivisorSelIn;
+		end if; 
+	 end process; 
+	 
 	 -- main dividing 
 	process(CLK)	
 	begin 
@@ -198,10 +205,12 @@ begin
 				Divisor 		<= "0000000000000101";
 			   Dividend		<= "0000000011100101"; --TODO for testing
 									
-			elsif (DigitClkEn = '1' and not CurDigit = "1100") then 
+			elsif (DigitClkEn = '1' and not (CurDigit = "1100")) then 
 				-- shift to next displayed digit 
 				--DivShiftReg <= DivShiftReg(64 downto 48) & DivShiftReg(3 downto 0) & DivShiftReg(47 downto 4);
-				--Dividend <= 
+				Dividend <= Divisor(3 downto 0) & Dividend(15 downto 4); 
+				Divisor <= Quotient(3 downto 0) & Divisor (15 downto 4); 
+				Quotient <= Dividend (3 downto 0) & Quotient(15 downto 4); 
 				
 				CarryFlag <= '1'; -- initial subtraction settings
 				Subtract <= '1';
@@ -226,14 +235,61 @@ begin
 				Dividend <= Dividend(14 downto 0) & Remainder(0);
 				Remainder <= SignResultBit & NextRemainder; 
 				Quotient <= Quotient(14 downto 0) & (not SignResultBit);
-					
-					
+				
+			elsif (std_match(MuxCntr, "11-------0") and --(calculateQ = '0') and
+					(HaveKey = '1') and (((CurDigit = "0011") and (DivisorSel = '0')) or
+                                       ((CurDigit = "0111") and (DivisorSel = '1')))) then 
+			  Quotient <= Quotient(11 downto 0) & Keypad; 
+				--
 			end if;
 		end if; 	  
 	 end process; 
+	 
+	 
+	 -- handle key input 
+	 
+	 -- edge (and key) detection on KeypadRdy
+    process(CLK)
+    begin
+
+        if rising_edge(CLK) then
+
+            -- shift the keypad ready signal to synchronize and edge detect
+            KeypadRdyS  <=  KeypadRdyS(1 downto 0) & KeypadRdy;
+
+            -- have a key if have one already that hasn't been processed or a
+            -- new one is coming in (rising edge of KeypadRdy), reset if on
+            -- the last clock of Digit 3 or Digit 7 (depending on position of
+            -- Divisor switch) and held otherwise
+            if  (std_match(KeypadRdyS, "01-")) then
+                -- set HaveKey on rising edge of synchronized KeypadRdy
+                HaveKey <=  '1';
+            elsif ((DigitClkEn = '1') and (CurDigit = "0011") and (DivisorSel = '0')) then
+                -- reset HaveKey if on Dividend and current digit is 3
+                HaveKey <=  '0';
+            elsif ((DigitClkEn = '1') and (CurDigit = "0111") and (DivisorSel = '1')) then
+                -- reset HaveKey if on Divisor and current digit is 7
+                HaveKey <=  '0';
+            else
+                -- otherwise hold the value
+                HaveKey <=  HaveKey;
+            end if;
+
+        end if;
+
+    end process;
+	 
+	 -- handle keypress (TODO merge)
+	 process(CLK) 
+	 begin
+	 
+	 end process; 
+	 
+	 
+	 
 
     -- create the counter for output the current digit - order is 3, 2, 1, 0,
-    --    7, 6, 5, 4, 11, 10, 9, then 8,  then 12
+    --    7, 6, 5, 4, 11, 10, 9, 8, then 12
     -- reset counter to 3, only increment if DigitClkEn is active
 
     process (CLK)
@@ -257,6 +313,9 @@ begin
                 end if;
 					 if (std_match(CurDigit, "1000")) then 
 						  CurDigit <= "1100";  
+					 end if; 
+					 if (std_match(CurDigit, "1100")) then 
+						  CurDigit <= "0011"; --TODO simplify logic 
 					 end if; 
             -- otherwise hold the current value
             else
