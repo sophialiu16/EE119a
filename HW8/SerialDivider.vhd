@@ -43,7 +43,7 @@ use  ieee.numeric_std.all;
 --                              tied high in hardware
 --     nCalculate             - calculate the quotient (active low)
 --     Divisor                - input the divisor (not the dividend)
---     KeypadRdy              - there is a key available
+--                   - there is a key available
 --     Keypad(3 downto 0)     - keypad input
 --     CLK                    - the clock (1 MHz)
 --
@@ -59,29 +59,22 @@ use  ieee.numeric_std.all;
 entity  SerialDivider  is
 
     port (
-        nReset      :  in   std_logic;
+        --nReset      :  in   std_logic;
         nCalculate  :  in   std_logic;
-        DivisorSelIn  :  in   std_logic;
+        DivisorSel  :  in   std_logic;
         KeypadRdy   :  in   std_logic;
         Keypad      :  in   std_logic_vector(3 downto 0);
         HexDigit    :  out  std_logic_vector(3 downto 0);
         DecoderEn   :  out  std_logic;
         DecoderBit  :  out  std_logic_vector(3 downto 0);
-		  DivideDoneOut : out std_logic; 
+		  --DivideDoneOut : out std_logic; 
         
-		  CLK         :  in   std_logic;
+	CLK         :  in   std_logic
 		  
-		  KeypadRow   :  in   std_logic_vector(3 downto 0); 
-		  KeypadCol   :  in   std_logic_vector(3 downto 0); 
-		  DigitSel    :  out  std_logic_vector(11 downto 0); 
---		  Divisor	  :  in   std_logic; 
---		  Calculate   :  in   std_logic; 
---		  HexDigit    :  out  std_logic_vector(3 downto 0); 
---		  DecoderEn   :  out  std_logic; 
---		  DecoderBit  :  out  std_logic_vector(3 downto 0); 
---		  Digit       :  out  std_logic_vector(11 downto 0); 
-		  Segments     :  out  std_logic_vector(6 downto 0)
-		  --TODO separate structure
+	--KeypadRow   :  in   std_logic_vector(3 downto 0); 
+	--KeypadCol   :  in   std_logic_vector(3 downto 0)
+		  --DigitSel    :  out  std_logic_vector(11 downto 0); 
+	--Segments     :  out  std_logic_vector(6 downto 0)
     );
 
 end  SerialDivider;
@@ -93,23 +86,23 @@ end  SerialDivider;
 
 architecture  demo  of  SerialDivider  is
 
-	 signal Remainder: std_logic_vector(16 downto 0);
-	 signal NextRemainder: std_logic_vector(15 downto 0);
-	 signal Quotient: std_logic_vector(15 downto 0); 
-	 signal Divisor: std_logic_vector(15 downto 0);
-	 signal Dividend : std_logic_vector(15 downto 0);
+	 signal Remainder: std_logic_vector(16 downto 0);-- 	  	:= (others => '0');
+	 signal NextRemainder: std_logic_vector(15 downto 0);-- 	:= (others => '0');
+	 signal Quotient: std_logic_vector(15 downto 0);--		  	:= (others => '0'); 
+	 signal Divisor: std_logic_vector(15 downto 0);--			:= (others => '0');
+	 signal Dividend : std_logic_vector(15 downto 0);--		:= (others => '0');
 
     -- keypad signals
     signal  HaveKey     :  std_logic;           -- have a key from the keypad
     signal  KeypadRdyS  :  std_logic_vector(2 downto 0); -- keypad ready synchronization
 
     -- LED multiplexing signals
-    signal  MuxCntr  :  unsigned(9 downto 0);   -- multiplex counter (to
+    signal  MuxCntr  :  unsigned(9 downto 0)	:= (others => '0');   -- multiplex counter (to
                                                 --    divide 1 MHz to 1 KHz)
     signal  DigitClkEn  :  std_logic;           -- enable for the digit clock
-    signal  CalcInEn    :  std_logic;           -- near end of a muxed digit
-                                                --    (to enable calculations)
-    signal  CurDigit  :  std_logic_vector(3 downto 0); -- current mux digit
+    --signal  CalcInEn    :  std_logic;           -- near end of a muxed digit
+                                                --    (to enable calculations) 
+    signal  CurDigit  :  std_logic_vector(3 downto 0) := "0011"; -- current mux digit
 
     --  12 stored hex digits and remainder (65 bits) in a shift register
     --signal  DivShiftReg  :  std_logic_vector(64 downto 0) := "00000000000000000" 
@@ -128,7 +121,7 @@ architecture  demo  of  SerialDivider  is
 	
 	signal DivideDone : std_logic; 
 	
-	signal DivisorSel : std_logic; 
+	--signal DivisorSel : std_logic; 
 
 begin
 
@@ -152,24 +145,21 @@ begin
 
         -- count on the rising edge (clear on reset)
         if rising_edge(CLK) then
-            if (nReset = '0') then
-                MuxCntr <= (others => '0'); --0;
-            else
+            --if (nReset = '0') then
+            --    MuxCntr <= (others => '0'); --0;
+            --else
                 MuxCntr <= MuxCntr + 1;
-            end if;
+            --end if;
         end if;
 
     end process;
 	 
 	 
 	 DigitClkEn  <=  '1'  when (MuxCntr = "1111111111")  else
-                    '0';
+                    '0'; 
 	 	 
-	 DivideDoneOut <= DivideDone; 
-	 --Remainder <= DivShiftReg(64 downto 48); 
-	 --Quotient <= (47 downto 32); 
-	 --Divisor <= DivShiftReg(31 downto 16); 
-	 --Dividend <= DivShiftReg(15 downto 0); 
+	 --DivideDoneOut <= DivideDone; 
+	 
 	 process(CLK) 
 	 begin 
 		if rising_edge(CLK) then 
@@ -183,41 +173,40 @@ begin
 	 end process; 
 	 
 	 
-	 process(CLK) --TODO need?
-	 begin 
-		if rising_edge(CLK) then 
-			DivisorSel <= DivisorSelIn;
-		end if; 
-	 end process; 
+--	 process(CLK) --TODO need?
+--	 begin 
+--		if rising_edge(CLK) then 
+--			DivisorSel <= DivisorSelIn;
+	--	end if; 
+	 --end process; 
 	 
 	 -- main dividing 
 	process(CLK)	
 	begin 
 		if rising_edge(clk) then 
-			-- reset the decoder to 3 on reset
-			if (nReset = '0') then
-				Subtract <= '1'; 
-				DivideDone <= '0'; 
-				CarryFlag <= '1'; 
-				Remainder 	<= "00000000000000000";
-				NextRemainder <= "0000000000000000"; --TODO move?
-			   Quotient  	<=	"0000000000000000";
-				Divisor 		<= "0000000000000101";
-			   Dividend		<= "0000000011100101"; --TODO for testing
-									
-			elsif (DigitClkEn = '1' and not (CurDigit = "1100")) then 
+			if (DigitClkEn = '1' and not (CurDigit = "1100")) then 
 				-- shift to next displayed digit 
 				--DivShiftReg <= DivShiftReg(64 downto 48) & DivShiftReg(3 downto 0) & DivShiftReg(47 downto 4);
 				Dividend <= Divisor(3 downto 0) & Dividend(15 downto 4); 
 				Divisor <= Quotient(3 downto 0) & Divisor (15 downto 4); 
 				Quotient <= Dividend (3 downto 0) & Quotient(15 downto 4); 
 				
-				CarryFlag <= '1'; -- initial subtraction settings
-				Subtract <= '1';
+				--CarryFlag <= '1'; -- initial subtraction settings
+				--Subtract <= '1';
 				DivideDone <= '0'; --TODO move
 			elsif (std_match(MuxCntr, "1000000000") and CalculateQ = '1' and CurDigit = "1100") then 
 				-- finished dividing
 				DivideDone <= '1';  
+			elsif (std_match(MuxCntr, "0000000000") and CalculateQ = '1'and CurDigit = "1100") then 
+				-- start dividing, reset signals
+				if (Divisor = "0000000000000000") then 
+					Quotient <= "1110111011101110";
+					DivideDone <= '1'; 
+				end if; 
+				CarryFlag <= '1'; -- initial subtraction settings
+				Subtract <= '1';
+                                NextRemainder <= (others => '0');
+				Remainder <= "0000000000000000" & Dividend(15);
 			elsif (std_match(MuxCntr, "0----00000") and CalculateQ = '1'and CurDigit = "1100") then 
 				-- start dividing 
 				Remainder <= Remainder(15 downto 0) & Dividend(15);
@@ -236,11 +225,10 @@ begin
 				Remainder <= SignResultBit & NextRemainder; 
 				Quotient <= Quotient(14 downto 0) & (not SignResultBit);
 				
-			elsif (std_match(MuxCntr, "11-------0") and --(calculateQ = '0') and
+			elsif (std_match(MuxCntr, "1100000000") and --(calculateQ = '0') and
 					(HaveKey = '1') and (((CurDigit = "0011") and (DivisorSel = '0')) or
                                        ((CurDigit = "0111") and (DivisorSel = '1')))) then 
-			  Quotient <= Quotient(11 downto 0) & Keypad; 
-				--
+			  Dividend <= Dividend(11 downto 0) & Keypad; 
 			end if;
 		end if; 	  
 	 end process; 
@@ -277,15 +265,7 @@ begin
 
         end if;
 
-    end process;
-	 
-	 -- handle keypress (TODO merge)
-	 process(CLK) 
-	 begin
-	 
-	 end process; 
-	 
-	 
+    end process;	 	 
 	 
 
     -- create the counter for output the current digit - order is 3, 2, 1, 0,
@@ -298,25 +278,25 @@ begin
         if (rising_edge(CLK)) then
 
             -- reset the decoder to 3 on reset
-            if (nReset = '0') then
-                CurDigit <= "0011"; --TODO add more digits, calculate later
+            --if (nReset = '0') then
+            --    CurDigit <= "0011"; --TODO add more digits, calculate later
 
             -- create the appropriate count sequence
-            elsif (DigitClkEn = '1') then
+            if (DigitClkEn = '1') then
                 CurDigit(0) <= not CurDigit(0);
                 CurDigit(1) <= CurDigit(1) xor not CurDigit(0);
-                if (std_match(CurDigit, "0-00")) then
+                if (std_match(CurDigit, "--00")) then -- 0-00
                     CurDigit(2) <= not CurDigit(2);
                 end if;
-                if (std_match(CurDigit, "-100") or std_match(CurDigit, "1-00")) then
+                if (std_match(CurDigit, "-100")) then-- or std_match(CurDigit, "1-00")) then
                     CurDigit(3) <= not CurDigit(3);
                 end if;
-					 if (std_match(CurDigit, "1000")) then 
-						  CurDigit <= "1100";  
-					 end if; 
-					 if (std_match(CurDigit, "1100")) then 
-						  CurDigit <= "0011"; --TODO simplify logic 
-					 end if; 
+		if (std_match(CurDigit, "1000")) then 
+			CurDigit <= "1100";  
+		end if; 
+		--if (std_match(CurDigit, "1100")) then 
+		--	CurDigit(2) <= "0011"; --TODO simplify logic 
+		--end if;
             -- otherwise hold the current value
             else
                 CurDigit <= CurDigit;
