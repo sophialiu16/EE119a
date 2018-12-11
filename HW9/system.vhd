@@ -30,6 +30,7 @@
 --     15 Jan 08     Glen George         Added decimal point segment and
 --                                          simple example connections for the
 --                                          result
+--     10 Dec 18     Sophia Liu          Added GCD entity 
 
 
 
@@ -120,24 +121,18 @@ architecture  structural  of  system  is
 
 begin
 
-    -- just do add/subtract without GCD block
-    r <=       a + b  when  (calculate = '1')
-         else  a - b;
-
-    -- result is always ready
-    result_rdy <= can_read_vals;
-
     -- don't ever output decimal points (remember segments are active low)
     segmentdp <= '1';
 
     -- instantiate and connect the blocks (entities)
-    Cntr: entity  counter port map(sysclk, mux_clk);
-    Kypd: entity  keypad  port map(sysclk, mux_clk, row, key_ack, col, key,
+    Cntr: entity  work.counter port map(sysclk, mux_clk);
+    Kypd: entity  work.keypad  port map(sysclk, mux_clk, row, key_ack, col, key,
                                    keyvalue);
-    Muxr: entity  muxer   port map(sysclk, keyvalue, key, operand,
+    Muxr: entity  work.muxer   port map(sysclk, keyvalue, key, operand,
                                    r, result_rdy, mux_clk,
                                    a, b, can_read_vals, key_ack, digit,
                                    segmenta, segmentb, segmentc, segmentd,
                                    segmente, segmentf, segmentg);
-
+	 GCD : entity work.GCD port map(sysclk, a, b, can_read_vals, calculate, r,
+											  result_rdy); 
 end structural;
